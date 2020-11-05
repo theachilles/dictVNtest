@@ -37,7 +37,7 @@ class Vnen_Collins {
                 return node.innerText.trim();
         }
 
-        let base = 'https://dictionary.cambridge.org/dictionary/english-vietnamese/';
+        let base = 'https://dictionary.cambridge.org/dictionary/english-vietnamese/a?q=/';
         let url = base + encodeURIComponent(word);
         let doc = '';
         try {
