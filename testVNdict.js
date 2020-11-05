@@ -1,5 +1,5 @@
 /* global api */
-class Vnen_Collins {
+class envn_Cambridge {
     constructor(options) {
         this.options = options;
         this.maxexample = 2;
@@ -8,11 +8,10 @@ class Vnen_Collins {
 
     async displayName() {
         let locale = await api.locale();
-        if (locale.indexOf('CN') != -1) return 'VNDICT';
-        if (locale.indexOf('TW') != -1) return 'VNDICT';
-        return 'VN English Dictionary';
+        if (locale.indexOf('CN') != -1) return '剑桥英法词典';
+        if (locale.indexOf('TW') != -1) return '剑桥英法词典';
+        return 'Cambridge EN->VN Dictionary';
     }
-
 
     setOptions(options) {
         this.options = options;
@@ -21,23 +20,37 @@ class Vnen_Collins {
 
     async findTerm(word) {
         this.word = word;
-        //let deflection = api.deinflect(word);
-        let results = await Promise.all([this.findCollins(word)]);
-        return [].concat(...results).filter(x => x);
+        return await this.findCambridge(word);
     }
 
-    async findCollins(word) {
-        let notes = [];
-        if (!word) return notes; // return empty notes
+    removeTags(elem, name) {
+        let tags = elem.querySelectorAll(name);
+        tags.forEach(x => {
+            x.outerHTML = '';
+        });
+    }
 
-        function T(node) {
-            if (!node)
-                return '';
-            else
-                return node.innerText.trim();
-        }
+    removelinks(elem) {
+        let tags = elem.querySelectorAll('a');
+        tags.forEach(x => {
+            x.outerHTML = x.innerText;
+        });
 
-        let base = 'https://dictionary.cambridge.org/dictionary/english-vietnamese/a?q=/';
+        tags = elem.querySelectorAll('h2');
+        tags.forEach(x => {
+            x.outerHTML = `<div class='head2'>${x.innerHTML}</div>`;
+        });
+
+        tags = elem.querySelectorAll('h3');
+        tags.forEach(x => {
+            x.outerHTML = `<div class='head3'>${x.innerHTML}</div>`;
+        });
+    }
+
+    async findCambridge(word) {
+        if (!word) return null;
+
+        let base = 'https://dictionary.cambridge.org/search/english-vietnamese/direct/?q=';
         let url = base + encodeURIComponent(word);
         let doc = '';
         try {
@@ -45,73 +58,50 @@ class Vnen_Collins {
             let parser = new DOMParser();
             doc = parser.parseFromString(data, 'text/html');
         } catch (err) {
-            return [];
+            return null;
         }
 
-        let dictionary = doc.querySelector('.dictionary.Cob_Adv_Brit');
-        if (!dictionary) return notes; // return empty notes
+        let contents = doc.querySelectorAll('.pr .dictionary') || [];
+        if (contents.length == 0) return null;
 
-        let expression = T(dictionary.querySelector('.h2_entry'));
-        let reading = T(dictionary.querySelector('.pron'));
-
-        let band = dictionary.querySelector('.word-frequency-img');
-        let bandnum = band ? band.dataset.band : '';
-        let extrainfo = bandnum ? `<span class="band">${'\u25CF'.repeat(Number(bandnum))}</span>` : '';
-
-        let sound = dictionary.querySelector('a.hwd_sound');
-        let audios = sound ? [sound.dataset.srcMp3] : [];
-        // make definition segement
-        let definitions = [];
-        let defblocks = dictionary.querySelectorAll('.hom') || [];
-        for (const defblock of defblocks) {
-            let pos = T(defblock.querySelector('.pos'));
-            pos = pos ? `<span class="pos">${pos}</span>` : '';
-            let eng_tran = T(defblock.querySelector('.sense .def'));
-            if (!eng_tran) continue;
-            let definition = '';
-            eng_tran = eng_tran.replace(RegExp(expression, 'gi'), '<b>$&</b>');
-            eng_tran = `<span class='eng_tran'>${eng_tran}</span>`;
-            let tran = `<span class='tran'>${eng_tran}</span>`;
-            definition += `${pos}${tran}`;
-
-            // make exmaple segement
-            let examps = defblock.querySelectorAll('.sense .cit.type-example') || '';
-            if (examps.length > 0 && this.maxexample > 0) {
-                definition += '<ul class="sents">';
-                for (const [index, examp] of examps.entries()) {
-                    if (index > this.maxexample - 1) break; // to control only 2 example sentence.
-                    let eng_examp = T(examp) ? T(examp).replace(RegExp(expression, 'gi'), '<b>$&</b>') : '';
-                    definition += eng_examp ? `<li class='sent'><span class='eng_sent'>${eng_examp}</span></li>` : '';
-                }
-                definition += '</ul>';
-            }
-            definition && definitions.push(definition);
+        let definition = '';
+        for (const content of contents) {
+            this.removeTags(content, '.extraexamps');
+            this.removeTags(content, '.definition-src');
+            this.removeTags(content, 'h2');
+            this.removeTags(content, '.d_br');
+            this.removeTags(content, '.freq.dfreq');
+            this.removelinks(content);
+            definition += content.innerHTML;
         }
         let css = this.renderCSS();
-        notes.push({
-            css,
-            expression,
-            reading,
-            extrainfo,
-            definitions,
-            audios,
-        });
-        return notes;
+        return definition ? css + definition : null;
     }
 
     renderCSS() {
         let css = `
             <style>
-                span.band {color:#e52920;}
-                span.pos  {text-transform:lowercase; font-size:0.9em; margin-right:5px; padding:2px 4px; color:white; background-color:#0d47a1; border-radius:3px;}
-                span.tran {margin:0; padding:0;}
-                span.eng_tran {margin-right:3px; padding:0;}
-                span.chn_tran {color:#0d47a1;}
-                ul.sents {font-size:0.8em; list-style:square inside; margin:3px 0;padding:5px;background:rgba(13,71,161,0.1); border-radius:5px;}
-                li.sent  {margin:0; padding:0;}
-                span.eng_sent {margin-right:5px;}
-                span.chn_sent {color:#0d47a1;}
+            .entry-body__el{margin-bottom:10px;}
+            .head2{font-size: 1.2em;font-weight:bold;}
+            .pos-header{border-bottom: 1px solid;}
+            .head3 {display:none;}
+            .posgram {font-size: 0.8em;background-color: #959595;color: white;padding: 2px 5px;border-radius: 3px;}
+            .epp-xref::after {content: ")";}
+            .epp-xref::before {content: "(";}
+            .def-block, .phrase-block {
+                /*border: 1px solid;*/
+                /*border-color: #e5e6e9 #dfe0e4 #d0d1d5;*/
+                border-radius: 3px;
+                padding: 5px;
+                margin: 5px 0;
+                background-color: #f6f6f6;
+            }
+            .phrase-block .def-block{border: initial;padding: initial;}
+            p.def-head {margin: auto;}
+            .phrase-head {vertical-align: middle;color: #1683ea;font-weight: bold;}
+            .trans {color: #5079bb;}
             </style>`;
+
         return css;
     }
 }
