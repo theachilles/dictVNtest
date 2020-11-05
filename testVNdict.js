@@ -8,8 +8,8 @@ class envn_Cambridge {
 
     async displayName() {
         let locale = await api.locale();
-        if (locale.indexOf('CN') != -1) return '剑桥英法词典';
-        if (locale.indexOf('TW') != -1) return '剑桥英法词典';
+        if (locale.indexOf('CN') != -1) return 'vndict';
+        if (locale.indexOf('TW') != -1) return 'vndict';
         return 'Cambridge EN->VN Dictionary';
     }
 
